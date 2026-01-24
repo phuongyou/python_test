@@ -1,0 +1,6 @@
+TARGETS = [
+    "Company B",
+    "Company A",
+    "123 North Street, 14th Floor",
+    "Chicago, IL 60606",
+]
