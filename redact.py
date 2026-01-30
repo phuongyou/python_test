@@ -18,7 +18,7 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 
 # ========== GEMINI CONFIG ==========
 # Bạn cần thay thế API_KEY này bằng key thật của bạn
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDdT1MkE7iRCW7owZmeCkFvEJ0bNvgN7c8")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDdssT1MkE7iRCWsss7owZmeCkFvEJ0bNvgN7c8")
 genai.configure(api_key=GEMINI_API_KEY)
 
 
@@ -409,7 +409,17 @@ def main():
 
     # 4. Chuẩn bị TARGETS (chỉ lấy value có dữ liệu để redact)
     global TARGETS
-    TARGETS = [str(item["value"]).lower() for item in filtered_fields if item.get("value")]
+    base_targets = [str(item["value"]).lower() for item in filtered_fields if item.get("value")]
+    # Nếu từ dài hơn 2 từ, tách thành các cụm 2 từ liên tiếp
+    def split_bigrams(text):
+        words = text.split()
+        if len(words) <= 2:
+            return []
+        return [" ".join(words[i:i+2]) for i in range(len(words)-1)]
+    bigram_targets = []
+    for t in base_targets:
+        bigram_targets.extend(split_bigrams(t))
+    TARGETS = base_targets + bigram_targets
 
     # 5. Redact PDF như cũ
     for page_index, page in enumerate(doc):
