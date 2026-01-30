@@ -4,3 +4,9 @@ TARGETS = [
     "123 North Street, 14th Floor",
     "Chicago, IL 60606",
 ]
+pip install pymupdf
+
+
+pip install flask flask-cors PyMuPDF pytesseract Pillow openpyxl rapidfuzz
+pip install opencv-python
+pip install google-generativeai
