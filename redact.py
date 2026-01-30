@@ -3,6 +3,7 @@ import pytesseract
 from PIL import Image
 import io
 import cv2
+import datetime
 import numpy as np
 from rapidfuzz import fuzz
 import openpyxl
@@ -17,7 +18,7 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 
 # ========== GEMINI CONFIG ==========
 # Bạn cần thay thế API_KEY này bằng key thật của bạn
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyA7rV9YmBpgOo9D-fMf5-NvSw2JJFyyrIs")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDdT1MkE7iRCW7owZmeCkFvEJ0bNvgN7c8")
 genai.configure(api_key=GEMINI_API_KEY)
 
 
@@ -32,7 +33,7 @@ OUTPUT_XLSX = os.path.join(OUTPUT_DIR, "redacted_fields.xlsx")
 # TARGETS sẽ được cập nhật tự động từ AI
 TARGETS = []
 
-FUZZY_THRESHOLD = 96        # match phrase
+FUZZY_THRESHOLD = 94        # match phrase
 OCR_THRESHOLD = 200         # xoá highlight
 LINE_Y_THRESHOLD = 12       # group words theo dòng
 
@@ -101,6 +102,10 @@ def redact_targets_from_lines(page, lines, targets, scale_x, scale_y):
     """
     ❗ CHỈ redact khi match ĐỦ PHRASE
     """
+    import string
+    def strip_punct(s):
+        return s.rstrip(string.punctuation)
+
     for line in lines:
         words = line["words"]
         texts = [w[0] for w in words]
@@ -110,8 +115,10 @@ def redact_targets_from_lines(page, lines, targets, scale_x, scale_y):
             t_len = len(target_words)
 
             for i in range(len(texts) - t_len + 1):
-                phrase = " ".join(texts[i:i+t_len]).lower()
-                score = fuzz.ratio(phrase, target)
+                # Chuẩn hóa: loại bỏ dấu câu cuối mỗi từ
+                phrase = " ".join(strip_punct(t) for t in texts[i:i+t_len]).lower()
+                target_norm = " ".join(strip_punct(t) for t in target_words).lower()
+                score = fuzz.ratio(phrase, target_norm)
 
                 if score >= FUZZY_THRESHOLD:
                     boxes = [words[j][1] for j in range(i, i+t_len)]
@@ -232,7 +239,17 @@ def get_redact_fields_from_gemini(text, contract_type="contract"):
   "consultant_phone": "Primary consultant phone number for the SOW",
   "supplier_name": "Supplier or vendor name associated with the SOW",
   "supplier_email": "Primary supplier email for the SOW",
-  "supplier_phone": "Primary supplier phone number for the SOW"
+  "supplier_phone": "Primary supplier phone number for the SOW",
+  
+  "project": "Project name associated with the SOW",
+  "supplier_tech_contact_name_1": "Supplier technical contact name 1",
+  "supplier_tech_contact_email_1": "Supplier technical contact email 1,
+  "supplier_tech_contact_phone_1": "Supplier technical contact phone 1",
+  "supplier_tech_contact_name_2": "Supplier technical contact name 2",
+  "supplier_tech_contact_email_2": "Supplier technical contact email 2",
+  "supplier_tech_contact_phone_2": "Supplier technical contact phone 2",
+  "accepted_client_name": "Name of the client who accepted the SOW",
+  "accepted_supplier_name": "Name of the supplier who accepted the SOW"
 }''',
         "co": '''{
   "sow_name": "CO name/title (Change Order title)",
@@ -361,7 +378,7 @@ def main():
 
     # 2. Gửi lên Gemini để lấy các field cần redact
     fields = get_redact_fields_from_gemini(all_text, contract_type=CONTRACT_TYPE)
-    print("Fields from Gemini:", fields)
+    # print("Fields from Gemini:", fields)
 
     # 2.1. Filter only redact fields by type
     REDACT_FIELDS = {
@@ -369,7 +386,11 @@ def main():
             "company", "company_address", "signed_title", "signed_name", "customer_name", "customer_address", "director_name"
         ],
         "sow": [
-            "sow_name", "client_name", "client_email", "client_phone", "application_name", "contact_title", "contact_name", "contact_email", "contact_phone", "consultant_name", "consultant_phone", "consultant_email", "supplier_name", "supplier_email", "supplier_phone"
+            "project","client_name","supplier_name","supplier_tech_contact_name_1",
+            "supplier_tech_contact_email_1","supplier_tech_contact_phone_1",
+            "supplier_tech_contact_name_2","supplier_tech_contact_email_2","supplier_tech_contact_phone_2",
+            "accepted_client_name","accepted_supplier_name"
+            # "sow_name", "client_name", "client_email", "client_phone", "application_name", "contact_title", "contact_name", "contact_email", "contact_phone", "consultant_name", "consultant_phone", "consultant_email", "supplier_name", "supplier_email", "supplier_phone"
         ],
         "co": [
             "sow_name", "client_name", "supplier_name", "sow_title", "change_number", "change_order_date"
@@ -381,14 +402,12 @@ def main():
     field_dict = {item.get("field", ""): item.get("value", "") for item in fields}
     filtered_fields = [
         {"field": k, "value": field_dict.get(k, "")}
-        for k in redact_keys if k in field_dict and field_dict.get(k, "")
+        for k in redact_keys
     ]
-    print("Filtered fields to redact:", filtered_fields)
-
-    # 3. Lưu field, value vào Excel
+    # 3. Lưu field, value vào Excel (ghi cả value rỗng)
     save_fields_to_excel(filtered_fields, OUTPUT_XLSX)
 
-    # 4. Chuẩn bị TARGETS
+    # 4. Chuẩn bị TARGETS (chỉ lấy value có dữ liệu để redact)
     global TARGETS
     TARGETS = [str(item["value"]).lower() for item in filtered_fields if item.get("value")]
 
@@ -401,13 +420,18 @@ def main():
             words = page.get_text("words")  # x0,y0,x1,y1,text
             texts = [w[4] for w in words]
 
+            import string
+            def strip_punct(s):
+                return s.rstrip(string.punctuation)
+
             for target in TARGETS:
                 target_words = target.split()
                 t_len = len(target_words)
 
                 for i in range(len(words) - t_len + 1):
-                    phrase = " ".join(w[4] for w in words[i:i+t_len]).lower()
-                    if fuzz.ratio(phrase, target) >= FUZZY_THRESHOLD:
+                    phrase = " ".join(strip_punct(w[4]) for w in words[i:i+t_len]).lower()
+                    target_norm = " ".join(strip_punct(t) for t in target_words).lower()
+                    if fuzz.ratio(phrase, target_norm) >= FUZZY_THRESHOLD:
                         x0 = min(w[0] for w in words[i:i+t_len])
                         y0 = min(w[1] for w in words[i:i+t_len])
                         x1 = max(w[2] for w in words[i:i+t_len])
@@ -453,6 +477,10 @@ if __name__ == "__main__":
         sys.exit(1)
     CONTRACT_TYPE = sys.argv[1]
     INPUT_PDF = sys.argv[2]
-    OUTPUT_PDF = os.path.join(OUTPUT_DIR, f"{os.path.splitext(os.path.basename(INPUT_PDF))[0]}_redacted_final.pdf")
-    OUTPUT_XLSX = os.path.join(OUTPUT_DIR, f"{os.path.splitext(os.path.basename(INPUT_PDF))[0]}_redacted_fields.xlsx")
+    # Tạo thư mục con theo kiểu type_ID (type + timestamp)
+    run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_folder = os.path.join(OUTPUT_DIR, f"{CONTRACT_TYPE}_{run_id}")
+    os.makedirs(run_folder, exist_ok=True)
+    OUTPUT_PDF = os.path.join(run_folder, f"{os.path.splitext(os.path.basename(INPUT_PDF))[0]}_redacted_final.pdf")
+    OUTPUT_XLSX = os.path.join(run_folder, f"{os.path.splitext(os.path.basename(INPUT_PDF))[0]}_redacted_fields.xlsx")
     main()
