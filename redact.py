@@ -18,7 +18,7 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 
 # ========== GEMINI CONFIG ==========
 # Bạn cần thay thế API_KEY này bằng key thật của bạn
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDdssT1MkE7iRCWsss7owZmeCkFvEJ0bNvgN7c8")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDUEGasdasdasdmc1aRViOk")
 genai.configure(api_key=GEMINI_API_KEY)
 
 
@@ -229,7 +229,9 @@ def get_redact_fields_from_gemini(text, contract_type="contract"):
   "client_name": "Client / Customer name associated with the SOW",
   "client_email": "Primary client email for the SOW",
   "client_phone": "Primary client phone number for the SOW",
-  "application_name": "Application or system name related to the SOW",
+  "application_name": "Extract the core application/system name only. If the project name contains words 
+    like 'Application', 'System', 'Platform', 'Services', 'Support', or 'Remote Services', exclude them. 
+    Prefer the main product name appearing before such keywords.",
   "contact_title": "Primary contact's job title for the SOW",
   "contact_name": "Primary contact's full name for the SOW",
   "contact_email": "Primary contact's email address for the SOW",
@@ -389,7 +391,7 @@ def main():
             "project","client_name","supplier_name","supplier_tech_contact_name_1",
             "supplier_tech_contact_email_1","supplier_tech_contact_phone_1",
             "supplier_tech_contact_name_2","supplier_tech_contact_email_2","supplier_tech_contact_phone_2",
-            "accepted_client_name","accepted_supplier_name"
+            "accepted_client_name","accepted_supplier_name","application_name"
             # "sow_name", "client_name", "client_email", "client_phone", "application_name", "contact_title", "contact_name", "contact_email", "contact_phone", "consultant_name", "consultant_phone", "consultant_email", "supplier_name", "supplier_email", "supplier_phone"
         ],
         "co": [
@@ -400,22 +402,27 @@ def main():
     redact_keys = REDACT_FIELDS.get(type_key, [])
     # Normalize Gemini output to dict for easy lookup
     field_dict = {item.get("field", ""): item.get("value", "") for item in fields}
+    # 3. Lưu field, value vào Excel (không ghi application_name)
     filtered_fields = [
         {"field": k, "value": field_dict.get(k, "")}
-        for k in redact_keys
+        for k in redact_keys if k != "application_name"
     ]
-    # 3. Lưu field, value vào Excel (ghi cả value rỗng)
     save_fields_to_excel(filtered_fields, OUTPUT_XLSX)
 
-    # 4. Chuẩn bị TARGETS (chỉ lấy value có dữ liệu để redact)
+    # 4. Chuẩn bị TARGETS (có cả application_name nếu có value)
     global TARGETS
-    base_targets = [str(item["value"]).lower() for item in filtered_fields if item.get("value")]
+    base_targets = [str(field_dict.get(k, "")).lower() for k in redact_keys if field_dict.get(k, "")]
     # Nếu từ dài hơn 2 từ, tách thành các cụm 2 từ liên tiếp
     def split_bigrams(text):
         words = text.split()
         if len(words) <= 2:
             return []
-        return [" ".join(words[i:i+2]) for i in range(len(words)-1)]
+        first = " ".join(words[:2])
+        rest = " ".join(words[2:]) if len(words) > 2 else ""
+        result = [first]
+        if rest:
+            result.append(rest)
+        return result
     bigram_targets = []
     for t in base_targets:
         bigram_targets.extend(split_bigrams(t))
