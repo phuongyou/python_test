@@ -49,6 +49,14 @@ def pdf_has_text_layer(doc, min_chars=50):
 
 def preprocess_image_for_ocr(pil_img):
     img_cv = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+    # Detect blue background and whiten it
+    hsv = cv2.cvtColor(img_cv, cv2.COLOR_BGR2HSV)
+    # Define blue color range (tune if needed)
+    lower_blue = np.array([90, 50, 50])
+    upper_blue = np.array([130, 255, 255])
+    mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
+    # Set blue regions to white
+    img_cv[mask_blue > 0] = [255, 255, 255]
     gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
     _, thresh = cv2.threshold(gray, OCR_THRESHOLD, 255, cv2.THRESH_BINARY)
     return Image.fromarray(thresh)
@@ -417,7 +425,7 @@ def main():
     # 2.1. Filter only redact fields by type
     REDACT_FIELDS = {
         "contract": [
-            "agreement", "client_name", "client_authorized_name", "client_address", "supplier_name","supplier_address"
+            "agreement", "client_name", "client_authorized_name", "client_address", "supplier_name","supplier_address",
             "supplier_authorized_name","doc_id","effective_date","sign_date","term_start_date","term_duration",
             "term_end_date","msa_renewals","payment_terms","invoice_frequency","audit_rights","audit_retention",
             "coi_required","coi_renewal","errors_omissions","general_liability","cyber_liability",
@@ -440,7 +448,7 @@ def main():
     field_dict = {item.get("field", ""): item.get("value", "") for item in fields}
     if type_key == "contract":
         CONTRACT_ALL_FIELDS = [
-            "agreement", "client_name", "client_authorized_name", "client_address", "supplier_name","supplier_address"
+            "agreement", "client_name", "client_authorized_name", "client_address", "supplier_name","supplier_address",
             "supplier_authorized_name","doc_id","effective_date","sign_date","term_start_date","term_duration",
             "term_end_date","msa_renewals","payment_terms","invoice_frequency","audit_rights","audit_retention",
             "coi_required","coi_renewal","errors_omissions","general_liability","cyber_liability",
@@ -484,7 +492,15 @@ def main():
 
     # 4. Chuẩn bị TARGETS (có cả application_name nếu có value)
     global TARGETS
-    base_targets = [str(field_dict.get(k, "")).lower() for k in redact_keys if field_dict.get(k, "")]
+    base_targets = []
+    for k in redact_keys:
+        value = str(field_dict.get(k, "")).lower()
+        if value:
+            if "address" in k:
+                # Nếu là trường address, chia nhỏ từng từ để redact riêng
+                base_targets.extend(value.split())
+            else:
+                base_targets.append(value)
     # Nếu từ dài hơn 2 từ, tách thành các cụm 2 từ liên tiếp
     def split_bigrams(text):
         words = text.split()
