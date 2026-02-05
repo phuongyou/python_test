@@ -7,8 +7,10 @@ import datetime
 import numpy as np
 from rapidfuzz import fuzz
 import openpyxl
+
 import os
 import google.generativeai as genai
+from config import GEMINI_API_KEY
 
 
 # ================= CONFIG =================
@@ -17,8 +19,7 @@ import google.generativeai as genai
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # ========== GEMINI CONFIG ==========
-# Bạn cần thay thế API_KEY này bằng key thật của bạn
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDUEGasdasdasdmc1aRViOk")
+# Lấy GEMINI_API_KEY từ file config.py
 genai.configure(api_key=GEMINI_API_KEY)
 
 
@@ -172,7 +173,7 @@ def get_redact_fields_from_gemini(text, contract_type="contract"):
   "contract_summary": "Brief summary of contract content",
   "description": "Detailed description of the contract",
   "status": "Active|Expired|Pending|Terminated|Incomplete (default Incomplete if unclear)",
-  "company": "Company name or organization associated with the contract",
+   "client_name": "Client name or organization associated with the contract",
   "contract_author_id": "Author or drafter of the contract if mentioned",
   "contract_manager_id": "Contract owner or manager if mentioned",
   "start_date": "Start date (YYYY-MM-DD)",
@@ -201,12 +202,30 @@ def get_redact_fields_from_gemini(text, contract_type="contract"):
   "docusign": "true/false (signed via DocuSign or similar electronic signature platform)",
   "alert_frequency_id": "Alert or reminder frequency if defined",
   "notes": "Other notes or additional extracted information",
-  "company_address": "Company address associated with the contract",
+  "client_address": "Client address associated with the contract",
   "signed_name": "Name of the person who signed the contract",
   "signed_title": "Title of the person who signed the contract",
   "customer_name": "Client / Customer name associated with the contract",
   "customer_address": "Client / Customer address associated with the contract",
-  "director_name": "Director or authorized signatory name"
+  "director_name": "Director or authorized signatory name",
+  "client_authorized_name": "Name of client authorized signatory",
+  "supplier_name": "Supplier or vendor name associated with the contract",
+  "supplier_authorized_name": "Name of supplier authorized signatory",
+  "supplier_address": "Supplier or vendor address associated with the contract",
+
+  "payment_terms": "Payment terms specified in contract",
+  "invoice_frequency": "Invoice frequency (e.g. monthly, quarterly)",
+  "audit_rights": "Audit rights description",
+  "audit_retention": "Audit retention period or terms",
+  "coi_renewal": "Certificate of insurance renewal terms",
+  "general_liability": "General liability insurance details",
+  "errors_omissions": "Errors & omissions insurance details",
+  "cyber_liability": "Cyber liability insurance details",
+  "additional_insured": "true/false (is additional insured required)",
+  "waiver_of_subrogation": "true/false (is waiver of subrogation required)",
+  "tail_coverage": "Tail coverage insurance details",
+  "agreement": "Type of agreement, corresponds to contract_type"
+  
 }''',
         "sow": '''{
   "sow_name": "SOW name/title",
@@ -244,14 +263,27 @@ def get_redact_fields_from_gemini(text, contract_type="contract"):
   "supplier_phone": "Primary supplier phone number for the SOW",
   
   "project": "Project name associated with the SOW",
-  "supplier_tech_contact_name_1": "Supplier technical contact name 1",
-  "supplier_tech_contact_email_1": "Supplier technical contact email 1,
-  "supplier_tech_contact_phone_1": "Supplier technical contact phone 1",
-  "supplier_tech_contact_name_2": "Supplier technical contact name 2",
-  "supplier_tech_contact_email_2": "Supplier technical contact email 2",
-  "supplier_tech_contact_phone_2": "Supplier technical contact phone 2",
-  "accepted_client_name": "Name of the client who accepted the SOW",
-  "accepted_supplier_name": "Name of the supplier who accepted the SOW"
+  "supplier_tech_contact_name": "Supplier technical contact's full name for the SOW",
+  "supplier_tech_contact_email": "Supplier technical contact's email address for the SOW",
+  "supplier_tech_contact_phone": "Supplier technical contact's phone number for the SOW",
+
+  "client_tech_contact_name": "Client technical contact's full name for the SOW",
+  "client_tech_contact_email": "Client technical contact's email address for the SOW",
+  "client_tech_contact_phone": "Client technical contact's phone number for the SOW",
+
+  "accepted_client_name": "Name of client representative who accepted the SOW",
+  "accepted_client_title": "Title of client representative who accepted the SOW",
+  "accepted_client_signed_date": "Date when client accepted and signed the SOW (YYYY-MM-DD)",
+
+  "accepted_supplier_name": "Name of supplier representative who accepted the SOW",
+  "accepted_supplier_title": "Title of supplier representative who accepted the SOW",
+  "accepted_supplier_signed_date": "Date when supplier accepted and signed the SOW (YYYY-MM-DD)",
+
+  "term_start_date": "Start date of the term (YYYY-MM-DD)",
+  "term_duration": "Duration of the term (number, e.g., months)",
+  "term_end_date": "End date of the term (YYYY-MM-DD)",
+  "doc_id": "Document identifier or reference number for the SOW"
+
 }''',
         "co": '''{
   "sow_name": "CO name/title (Change Order title)",
@@ -385,13 +417,19 @@ def main():
     # 2.1. Filter only redact fields by type
     REDACT_FIELDS = {
         "contract": [
-            "company", "company_address", "signed_title", "signed_name", "customer_name", "customer_address", "director_name"
+            "agreement", "client_name", "client_authorized_name", "client_address", "supplier_name","supplier_address"
+            "supplier_authorized_name","doc_id","effective_date","sign_date","term_start_date","term_duration",
+            "term_end_date","msa_renewals","payment_terms","invoice_frequency","audit_rights","audit_retention",
+            "coi_required","coi_renewal","errors_omissions","general_liability","cyber_liability",
+            "additional_insured","waiver_of_subrogation","tail_coverage"
         ],
         "sow": [
-            "project","client_name","supplier_name","supplier_tech_contact_name_1",
-            "supplier_tech_contact_email_1","supplier_tech_contact_phone_1",
-            "supplier_tech_contact_name_2","supplier_tech_contact_email_2","supplier_tech_contact_phone_2",
-            "accepted_client_name","accepted_supplier_name","application_name"
+            "project","client_name","supplier_name",
+            "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
+            "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
+            "accepted_client_name","accepted_client_title","application_name",
+            "accepted_client_signed_date", "accepted_supplier_name" ,"accepted_supplier_title","accepted_supplier_signed_date",
+            "doc_id","effective_date","term_start_date", "term_duration", "term_end_date"
             # "sow_name", "client_name", "client_email", "client_phone", "application_name", "contact_title", "contact_name", "contact_email", "contact_phone", "consultant_name", "consultant_phone", "consultant_email", "supplier_name", "supplier_email", "supplier_phone"
         ],
         "co": [
@@ -399,14 +437,49 @@ def main():
         ]
     }
     type_key = CONTRACT_TYPE.lower()
-    redact_keys = REDACT_FIELDS.get(type_key, [])
-    # Normalize Gemini output to dict for easy lookup
     field_dict = {item.get("field", ""): item.get("value", "") for item in fields}
-    # 3. Lưu field, value vào Excel (không ghi application_name)
-    filtered_fields = [
-        {"field": k, "value": field_dict.get(k, "")}
-        for k in redact_keys if k != "application_name"
-    ]
+    if type_key == "contract":
+        CONTRACT_ALL_FIELDS = [
+            "agreement", "client_name", "client_authorized_name", "client_address", "supplier_name","supplier_address"
+            "supplier_authorized_name","doc_id","effective_date","sign_date","term_start_date","term_duration",
+            "term_end_date","msa_renewals","payment_terms","invoice_frequency","audit_rights","audit_retention",
+            "coi_required","coi_renewal","errors_omissions","general_liability","cyber_liability",
+            "additional_insured","waiver_of_subrogation","tail_coverage"
+        ]
+        redact_keys = [
+            "client_name", "client_authorized_name", "client_address", "supplier_name","supplier_address", "supplier_authorized_name"
+        ]
+        filtered_fields = [
+            {"field": k, "value": field_dict.get(k, "")}
+            for k in CONTRACT_ALL_FIELDS if k != "application_name"
+        ]
+    elif type_key == "sow":
+        SOW_ALL_FIELDS = [
+            "project","client_name","supplier_name",
+            "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
+            "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
+            "accepted_client_name","accepted_client_title","application_name",
+            "accepted_client_signed_date", "accepted_supplier_name" ,"accepted_supplier_title","accepted_supplier_signed_date",
+            "doc_id","effective_date","term_start_date", "term_duration", "term_end_date"
+        ]
+        SOW_REDACT_FIELDS = [
+            "project","client_name","supplier_name",
+            "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
+            "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
+            "accepted_client_name","accepted_client_title","application_name",
+            "accepted_client_signed_date", "accepted_supplier_name" ,"accepted_supplier_title","accepted_supplier_signed_date"
+        ]
+        redact_keys = SOW_REDACT_FIELDS
+        filtered_fields = [
+            {"field": k, "value": field_dict.get(k, "")}
+            for k in SOW_ALL_FIELDS if k != "application_name"
+        ]
+    else:
+        redact_keys = REDACT_FIELDS.get(type_key, [])
+        filtered_fields = [
+            {"field": k, "value": field_dict.get(k, "")}
+            for k in redact_keys if k != "application_name"
+        ]
     save_fields_to_excel(filtered_fields, OUTPUT_XLSX)
 
     # 4. Chuẩn bị TARGETS (có cả application_name nếu có value)
