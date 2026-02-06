@@ -431,13 +431,13 @@ def main():
 
 
     # 2. Gửi lên Gemini để lấy các field cần redact
-    # fields = get_redact_fields_from_gemini(all_text, contract_type=CONTRACT_TYPE)
-    fields = [
-        {"field": "client_name", "value": "huahsduhaushdauhduadhs"},
-        {"field": "supplier_name", "value": "Acme Corp"},
-        {"field": "client_address", "value": "123 Main St"},
-        {"field": "application_name", "value": "TestApp"}
-    ]
+    fields = get_redact_fields_from_gemini(all_text, contract_type=CONTRACT_TYPE)
+    # fields = [
+    #     {"field": "client_name", "value": "huahsduhaushdauhduadhs"},
+    #     {"field": "supplier_name", "value": "Acme Corp"},
+    #     {"field": "client_address", "value": "123 Main St"},
+    #     {"field": "application_name", "value": "TestApp"}
+    # ]
     # print("Fields from Gemini:", fields)
 
     # 2.1. Filter only redact fields by type
