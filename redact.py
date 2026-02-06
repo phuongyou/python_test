@@ -62,6 +62,39 @@ def preprocess_image_for_ocr(pil_img):
     return Image.fromarray(thresh)
 
 
+def upscale_and_enhance_for_ocr(pil_img, scale=2):
+    """
+    Upscale và enhance hình ảnh để cải thiện OCR accuracy
+    """
+    import cv2
+    
+    # Upscale hình ảnh
+    img_cv = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+    h, w = img_cv.shape[:2]
+    upscaled = cv2.resize(img_cv, (w * scale, h * scale), interpolation=cv2.INTER_CUBIC)
+    
+    # Convert to grayscale
+    gray = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)
+    
+    # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)
+    
+    # Apply denoising
+    denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 10, 21)
+    
+    # Sharpen
+    kernel = np.array([[-1, -1, -1],
+                       [-1,  9, -1],
+                       [-1, -1, -1]])
+    sharpened = cv2.filter2D(denoised, -1, kernel)
+    
+    # Apply threshold
+    _, thresh = cv2.threshold(sharpened, 150, 255, cv2.THRESH_BINARY)
+    
+    return Image.fromarray(thresh)
+
+
 def ocr_image(img):
     return pytesseract.image_to_data(
         img,
@@ -430,18 +463,47 @@ def main():
     has_text = pdf_has_text_layer(doc)
     print(f"📄 PDF has text layer: {has_text}")
 
+    # Import fuzz cho hàm main
+    from rapidfuzz import fuzz as fuzzy
+
     # 1. Trích xuất toàn bộ text
     all_text = extract_all_text_from_pdf(doc)
 
 
     # 2. Gửi lên Gemini để lấy các field cần redact
     fields = get_redact_fields_from_gemini(all_text, contract_type=CONTRACT_TYPE)
+    # Add logo_company field for logo redaction
     # fields = [
+    #     {"field": "project", "value": "Oracle Remote Support Services- Monitoring and Management"},
+    #     {"field": "client_name", "value": "AC LLC"},
+    #     {"field": "supplier_name", "value": "BEST EVER INC"},
+    #     {"field": "supplier_tech_contact_name", "value": "Jane Doe"},
     #     {"field": "supplier_tech_contact_email", "value": "jdoe@ BEST EVER.com"},
-    #     {"field": "client_tech_contact_email", "value": "josh.mabry@AC LLC.com"},
-    #     {"field": "client_address", "value": "123 Main St"},
-    #     {"field": "client_tech_contact_name", "value": "Jon Smith"}
+    #     {"field": "supplier_tech_contact_phone", "value": "(555) 921-567"},
+    #     {"field": "client_tech_contact_name", "value": "Jon Smith"},
+    #     {"field": "client_tech_contact_email", "value": "josh.mabry@ AC LLC.com"},
+    #     {"field": "client_tech_contact_phone", "value": "(555) 511-1234"},
+    #     {"field": "accepted_client_name", "value": "Dwight Eisenhower"},
+    #     {"field": "accepted_client_title", "value": "CIO"},
+    #     {"field": "accepted_client_signed_date", "value": "2025-08-01"},
+    #     {"field": "accepted_supplier_name", "value": "John F. Kennedy"},
+    #     {"field": "accepted_supplier_title", "value": "CEO"},
+    #     {"field": "accepted_supplier_signed_date", "value": "2025-08-02"},
+    #     {"field": "doc_id", "value": "DOC-2025-001"},
+    #     {"field": "effective_date", "value": "2025-08-01"},
+    #     {"field": "term_start_date", "value": "2025-08-01"},
+    #     {"field": "term_duration", "value": "12"},
+    #     {"field": "term_end_date", "value": "2026-08-31"},
+    #     {"field": "consultant_fee_schedule_Investment", "value": "$3,000"},
+    #     {"field": "retainer_summary_annual_retainer_fee", "value": ""},
+    #     {"field": "services_fee_schedule_investment", "value": ""},
+    #     {"field": "monthly_support_schedule_term_length", "value": "twelve (12) months"},
+    #     {"field": "monthly_support_schedule_term_end", "value": "2026-08-31"},
+    #     {"field": "monthly_support_schedule_hours_per_month", "value": "15 hours per month"},
+    #     {"field": "monthly_support_schedule_discount", "value": "10%"},
+    #     {"field": "monthly_support_schedule_monthly_rate", "value": "$3,000"},
     # ]
+    fields.append({"field": "logo_company", "value": "Viscosity"})
     # print("Fields from Gemini:", fields)
 
     # 2.1. Filter only redact fields by type
@@ -503,7 +565,7 @@ def main():
             "monthly_support_schedule_monthly_rate"
         ]
         SOW_REDACT_FIELDS = [
-            "project","client_name","supplier_name",
+            "client_name","supplier_name",
             "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
             "client_tech_contact_name","client_tech_contact_email","client_tech_contact_phone",
             "accepted_client_name","accepted_client_title","application_name",
@@ -569,16 +631,20 @@ def main():
                 for i in range(len(words) - t_len + 1):
                     phrase = " ".join(strip_punct(w[4]) for w in words[i:i+t_len]).lower()
                     target_norm = " ".join(strip_punct(t) for t in target_words).lower()
-                    if fuzz.ratio(phrase, target_norm) >= FUZZY_THRESHOLD:
-                        x0 = min(w[0] for w in words[i:i+t_len])
-                        y0 = min(w[1] for w in words[i:i+t_len])
-                        x1 = max(w[2] for w in words[i:i+t_len])
-                        y1 = max(w[3] for w in words[i:i+t_len])
-
-                        page.add_redact_annot(
-                            fitz.Rect(x0, y0, x1, y1),
-                            fill=(0, 0, 0)
-                        )
+                    if fuzzy.ratio(phrase, target_norm) >= FUZZY_THRESHOLD:
+                        # Chỉ che đúng từng từ/cụm từ khớp target, không che lan sang dòng trên/dưới
+                        for w in words[i:i+t_len]:
+                            x0, y0, x1, y1 = w[0], w[1], w[2], w[3]
+                            # Giảm chiều cao vùng redact để không che lấn dòng trên/dưới
+                            pad = 1  # số pixel padding nhỏ để không bị hở
+                            y0_adj = y0 + pad
+                            y1_adj = y1 - pad
+                            if y1_adj <= y0_adj:
+                                y0_adj, y1_adj = y0, y1  # fallback nếu từ quá nhỏ
+                            page.add_redact_annot(
+                                fitz.Rect(x0, y0_adj, x1, y1_adj),
+                                fill=(0, 0, 0)
+                            )
 
         else:
             pix = page.get_pixmap(dpi=300)
@@ -603,15 +669,44 @@ def main():
         page.apply_redactions()
 
     # Redact logo (hình ảnh) sau khi đã redact text
-    # Redact images (logo) trên doc hiện tại (đã có text redactions)
-    for page in doc:
-        img_list = page.get_images(full=True)
-        for img in img_list:
-            xref = img[0]
-            rects = page.get_image_rects(xref)
-            for rect in rects:
-                page.add_redact_annot(rect, fill=(0, 0, 0))
-        page.apply_redactions()
+    # Redact images (logo) chỉ nếu chứa company name
+    logo_company_value = field_dict.get("logo_company", "").lower().strip()
+    if logo_company_value:
+        print(f"🎯 Searching for company logo '{logo_company_value}' in images...")
+        for page_idx, page in enumerate(doc):
+            img_list = page.get_images(full=True)
+            # print(f"   Page {page_idx + 1}: Found {len(img_list)} image(s)")
+            for img_idx, img in enumerate(img_list):
+                xref = img[0]
+                # Trích xuất từng hình ảnh riêng biệt bằng OCR
+                try:
+                    # Lấy binary data của hình ảnh từ PDF
+                    img_data = doc.extract_image(xref)
+                    if img_data:
+                        img_bytes = img_data["image"]
+                        pil_img = Image.open(io.BytesIO(img_bytes))
+                        
+                        # Upscale và enhance hình ảnh để cải thiện OCR
+                        enhanced_img = upscale_and_enhance_for_ocr(pil_img, scale=3)
+                        ocr_text = pytesseract.image_to_string(enhanced_img).lower()
+                        
+                        print(f"      Image {img_idx + 1} OCR text: '{ocr_text[:80]}'")
+                        
+                        # Dùng fuzzy matching để so sánh (cho phép sai số nhỏ)
+                        similarity = fuzzy.token_set_ratio(logo_company_value, ocr_text)
+                        # print(f"      Similarity score: {similarity}")
+                        
+                        # Nếu similarity > 60% thì coi là đã tìm thấy
+                        if similarity > 54:
+                            print(f"   ✓ Found company matching '{logo_company_value}' in image {img_idx + 1} on page {page_idx + 1} (similarity: {similarity}%)")
+                            rects = page.get_image_rects(xref)
+                            for rect in rects:
+                                page.add_redact_annot(rect, fill=(0, 0, 0))
+                except Exception as e:
+                    print(f"      ⚠ Error processing image {img_idx + 1} on page {page_idx + 1}: {e}")
+            page.apply_redactions()
+    else:
+        print(f"⚠️  No logo_company value found in fields")
     
     doc.save(OUTPUT_PDF)
     doc.close()
