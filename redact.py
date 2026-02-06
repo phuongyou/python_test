@@ -485,11 +485,11 @@ def main():
     #     {"field": "client_tech_contact_phone", "value": "(555) 511-1234"},
     #     {"field": "accepted_client_name", "value": "Dwight Eisenhower"},
     #     {"field": "accepted_client_title", "value": "CIO"},
-    #     {"field": "accepted_client_signed_date", "value": "2025-08-01"},
+    #     {"field": "accepted_client_signed_date", "value": ""},
     #     {"field": "accepted_supplier_name", "value": "John F. Kennedy"},
     #     {"field": "accepted_supplier_title", "value": "CEO"},
-    #     {"field": "accepted_supplier_signed_date", "value": "2025-08-02"},
-    #     {"field": "doc_id", "value": "DOC-2025-001"},
+    #     {"field": "accepted_supplier_signed_date", "value": ""},
+    #     {"field": "doc_id", "value": ""},
     #     {"field": "effective_date", "value": "2025-08-01"},
     #     {"field": "term_start_date", "value": "2025-08-01"},
     #     {"field": "term_duration", "value": "12"},
@@ -500,7 +500,7 @@ def main():
     #     {"field": "monthly_support_schedule_term_length", "value": "twelve (12) months"},
     #     {"field": "monthly_support_schedule_term_end", "value": "2026-08-31"},
     #     {"field": "monthly_support_schedule_hours_per_month", "value": "15 hours per month"},
-    #     {"field": "monthly_support_schedule_discount", "value": "10%"},
+    #     {"field": "monthly_support_schedule_discount", "value": ""},
     #     {"field": "monthly_support_schedule_monthly_rate", "value": "$3,000"},
     # ]
     fields.append({"field": "logo_company", "value": "Viscosity"})
@@ -568,7 +568,7 @@ def main():
             "client_name","supplier_name",
             "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
             "client_tech_contact_name","client_tech_contact_email","client_tech_contact_phone",
-            "accepted_client_name","accepted_client_title","application_name",
+            "accepted_client_name","accepted_client_title",
             "accepted_client_signed_date", "accepted_supplier_name" ,"accepted_supplier_title","accepted_supplier_signed_date"
         ]
         redact_keys = SOW_REDACT_FIELDS
