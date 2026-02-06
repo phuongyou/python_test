@@ -386,7 +386,11 @@ def get_redact_fields_from_gemini(text, contract_type="contract"):
         contract_type_key = "contract"
     field_template = FIELD_TEMPLATES[contract_type_key]
     prompt = f"""
-You are an AI that extracts sensitive information for redaction. Below is the content of a PDF file of type '{contract_type}'. Only extract fields exactly as in the following JSON template. For each field, return the field name and the actual value found in the document (leave value empty if not found). Return the result as a JSON list: [{{'field': ..., 'value': ...}}, ...].
+You are an AI that extracts sensitive information for redaction. Below is the content of a PDF file of type '{contract_type}'. Only extract fields exactly as in the following JSON template. For each field, return the field name and the actual value found in the document (leave value empty if not found). 
+
+IMPORTANT: Preserve all spaces, formatting, and special characters EXACTLY as they appear in the document. Do NOT remove, modify, or normalize any spaces or characters in the extracted values.
+
+Return the result as a JSON list: [{{'field': ..., 'value': ...}}, ...].
 
 FIELD TEMPLATE FOR TYPE '{contract_type}':
 {field_template}
@@ -433,10 +437,10 @@ def main():
     # 2. Gửi lên Gemini để lấy các field cần redact
     fields = get_redact_fields_from_gemini(all_text, contract_type=CONTRACT_TYPE)
     # fields = [
-    #     {"field": "client_name", "value": "huahsduhaushdauhduadhs"},
-    #     {"field": "supplier_name", "value": "Acme Corp"},
+    #     {"field": "supplier_tech_contact_email", "value": "jdoe@ BEST EVER.com"},
+    #     {"field": "client_tech_contact_email", "value": "josh.mabry@AC LLC.com"},
     #     {"field": "client_address", "value": "123 Main St"},
-    #     {"field": "application_name", "value": "TestApp"}
+    #     {"field": "client_tech_contact_name", "value": "Jon Smith"}
     # ]
     # print("Fields from Gemini:", fields)
 
