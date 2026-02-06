@@ -290,7 +290,17 @@ def get_redact_fields_from_gemini(text, contract_type="contract"):
   "term_start_date": "Start date of the term (YYYY-MM-DD)",
   "term_duration": "Duration of the term (number, e.g., months)",
   "term_end_date": "End date of the term (YYYY-MM-DD)",
-  "doc_id": "Document identifier or reference number for the SOW"
+  "doc_id": "Document identifier or reference number for the SOW",
+  "consultant_fee_schedule_Investment": "Fee schedule related to investment consulting services, including rates, pricing, or payment structure defined in the SOW",
+  "retainer_summary_annual_retainer_fee": "Total annual retainer fee amount stated in the contract for ongoing consulting or support services",
+  "services_fee_schedule_investment": "Detailed fee schedule for investment-related services, including service types, rates, and billing terms",
+  "monthly_support_schedule_term_length": "Duration or length of the monthly support agreement, expressed in months or years",
+  "monthly_support_schedule_term_end": "End date of the monthly support term (YYYY-MM-DD)",
+  "monthly_support_schedule_hours_per_month": "Number of support or consulting hours provided per month under the support agreement",
+  "monthly_support_schedule_discount": "Discount applied to the monthly support fees, as a percentage or fixed amount",
+  "monthly_support_schedule_monthly_rate": "Monthly fee or rate charged for support services under the monthly support schedule"
+
+  
 
 }''',
         "co": '''{
@@ -437,7 +447,12 @@ def main():
             "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
             "accepted_client_name","accepted_client_title","application_name",
             "accepted_client_signed_date", "accepted_supplier_name" ,"accepted_supplier_title","accepted_supplier_signed_date",
-            "doc_id","effective_date","term_start_date", "term_duration", "term_end_date"
+            "doc_id","effective_date","term_start_date", "term_duration", "term_end_date",
+            "consultant_fee_schedule_Investment",
+            "retainer_summary_annual_retainer_fee","services_fee_schedule_investment",
+            "monthly_support_schedule_term_length","monthly_support_schedule_term_end",
+            "monthly_support_schedule_hours_per_month","monthly_support_schedule_discount",
+            "monthly_support_schedule_monthly_rate"
             # "sow_name", "client_name", "client_email", "client_phone", "application_name", "contact_title", "contact_name", "contact_email", "contact_phone", "consultant_name", "consultant_phone", "consultant_email", "supplier_name", "supplier_email", "supplier_phone"
         ],
         "co": [
@@ -468,7 +483,12 @@ def main():
             "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
             "accepted_client_name","accepted_client_title","application_name",
             "accepted_client_signed_date", "accepted_supplier_name" ,"accepted_supplier_title","accepted_supplier_signed_date",
-            "doc_id","effective_date","term_start_date", "term_duration", "term_end_date"
+            "doc_id","effective_date","term_start_date", "term_duration", "term_end_date",
+            "consultant_fee_schedule_Investment",
+            "retainer_summary_annual_retainer_fee","services_fee_schedule_investment",
+            "monthly_support_schedule_term_length","monthly_support_schedule_term_end",
+            "monthly_support_schedule_hours_per_month","monthly_support_schedule_discount",
+            "monthly_support_schedule_monthly_rate"
         ]
         SOW_REDACT_FIELDS = [
             "project","client_name","supplier_name",
