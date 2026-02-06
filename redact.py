@@ -150,6 +150,8 @@ def redact_targets_from_lines(page, lines, targets, scale_x, scale_y):
 
 # ================= MAIN =================
 
+
+
 def extract_all_text_from_pdf(doc):
     """
     Trả về toàn bộ text của PDF (ưu tiên text layer, nếu không có thì OCR)
@@ -291,9 +293,9 @@ def get_redact_fields_from_gemini(text, contract_type="contract"):
   "term_duration": "Duration of the term (number, e.g., months)",
   "term_end_date": "End date of the term (YYYY-MM-DD)",
   "doc_id": "Document identifier or reference number for the SOW",
-  "consultant_fee_schedule_Investment": "Fee schedule related to investment consulting services, including rates, pricing, or payment structure defined in the SOW",
+  "consultant_fee_schedule_Investment": "Single monetary fee amount under the Investment column in the Consultant Fee Schedule table (e.g. $3,000), representing the investment consulting fee only",
+  "services_fee_schedule_investment": "Detailed breakdown of individual investment services (service names, descriptions, line items) ONLY if a separate services fee schedule table exists; DO NOT extract summary fees or total amounts",
   "retainer_summary_annual_retainer_fee": "Total annual retainer fee amount stated in the contract for ongoing consulting or support services",
-  "services_fee_schedule_investment": "Detailed fee schedule for investment-related services, including service types, rates, and billing terms",
   "monthly_support_schedule_term_length": "Duration or length of the monthly support agreement, expressed in months or years",
   "monthly_support_schedule_term_end": "End date of the monthly support term (YYYY-MM-DD)",
   "monthly_support_schedule_hours_per_month": "Number of support or consulting hours provided per month under the support agreement",
@@ -429,7 +431,13 @@ def main():
 
 
     # 2. Gửi lên Gemini để lấy các field cần redact
-    fields = get_redact_fields_from_gemini(all_text, contract_type=CONTRACT_TYPE)
+    # fields = get_redact_fields_from_gemini(all_text, contract_type=CONTRACT_TYPE)
+    fields = [
+        {"field": "client_name", "value": "huahsduhaushdauhduadhs"},
+        {"field": "supplier_name", "value": "Acme Corp"},
+        {"field": "client_address", "value": "123 Main St"},
+        {"field": "application_name", "value": "TestApp"}
+    ]
     # print("Fields from Gemini:", fields)
 
     # 2.1. Filter only redact fields by type
@@ -444,7 +452,7 @@ def main():
         "sow": [
             "project","client_name","supplier_name",
             "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
-            "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
+            "client_tech_contact_name","client_tech_contact_email","client_tech_contact_phone",
             "accepted_client_name","accepted_client_title","application_name",
             "accepted_client_signed_date", "accepted_supplier_name" ,"accepted_supplier_title","accepted_supplier_signed_date",
             "doc_id","effective_date","term_start_date", "term_duration", "term_end_date",
@@ -480,7 +488,7 @@ def main():
         SOW_ALL_FIELDS = [
             "project","client_name","supplier_name",
             "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
-            "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
+            "client_tech_contact_name","client_tech_contact_email","client_tech_contact_phone",
             "accepted_client_name","accepted_client_title","application_name",
             "accepted_client_signed_date", "accepted_supplier_name" ,"accepted_supplier_title","accepted_supplier_signed_date",
             "doc_id","effective_date","term_start_date", "term_duration", "term_end_date",
@@ -493,7 +501,7 @@ def main():
         SOW_REDACT_FIELDS = [
             "project","client_name","supplier_name",
             "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
-            "supplier_tech_contact_name","supplier_tech_contact_email","supplier_tech_contact_phone",
+            "client_tech_contact_name","client_tech_contact_email","client_tech_contact_phone",
             "accepted_client_name","accepted_client_title","application_name",
             "accepted_client_signed_date", "accepted_supplier_name" ,"accepted_supplier_title","accepted_supplier_signed_date"
         ]
@@ -590,6 +598,17 @@ def main():
 
         page.apply_redactions()
 
+    # Redact logo (hình ảnh) sau khi đã redact text
+    # Redact images (logo) trên doc hiện tại (đã có text redactions)
+    for page in doc:
+        img_list = page.get_images(full=True)
+        for img in img_list:
+            xref = img[0]
+            rects = page.get_image_rects(xref)
+            for rect in rects:
+                page.add_redact_annot(rect, fill=(0, 0, 0))
+        page.apply_redactions()
+    
     doc.save(OUTPUT_PDF)
     doc.close()
     print(f"✅ DONE – Redacted PDF and Excel saved in {OUTPUT_DIR}")
